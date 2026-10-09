@@ -3,6 +3,11 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+# exclude local sqlite
+ledger.db
+*.db-shm
+*.db-wal
+
 # dotenv files
 .env
 
