@@ -1,4 +1,5 @@
 using LedgerApi.Data;
+using LedgerApi.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,11 +14,14 @@ builder.Services.AddOpenApi();
 var connectionString = builder.Configuration.GetConnectionString("Ledger");
 builder.Services.AddDbContext<LedgerDbContext>(ctx => ctx.UseSqlite(connectionString));
 
+builder.Services.AddScoped<LedgerService>();
+
 var app = builder.Build();
 
-// Migrate the Db.
 using (var scope = app.Services.CreateScope())
+{
 	scope.ServiceProvider.GetRequiredService<LedgerDbContext>().Database.Migrate();
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
