@@ -24,7 +24,8 @@ namespace LedgerApi.Services
 			_context = context;
 		}
 
-		public async Task<PostResult> PostAsync(Guid accountId, string idempotencyKey, Dtos.PostTransactionRequest req, CancellationToken ct) {
+		public async Task<PostResult> PostAsync(Guid accountId, string idempotencyKey, Dtos.PostTransactionRequest req, CancellationToken ct)
+		{
 			Money requestedAmount = new(req.AmountCents, req.Currency);
 
 			// grab account by id
@@ -66,7 +67,8 @@ namespace LedgerApi.Services
 			if (violation != null)
 				return new PostResult.Rejected(violation);
 
-			LedgerTransaction transaction = new LedgerTransaction {
+			LedgerTransaction transaction = new LedgerTransaction
+			{
 				Id = Guid.NewGuid(),
 				AccountId = accountId,
 				Type = req.Type!.Value,
@@ -82,13 +84,15 @@ namespace LedgerApi.Services
 			{
 				await _context.SaveChangesAsync(ct);
 			}
-			catch (DbUpdateException ex) when (ex.InnerException is SqliteException { SqliteErrorCode: 19})
+			catch (DbUpdateException ex) when (ex.InnerException is SqliteException { SqliteErrorCode: 19 })
 			{
 				_context.Entry(transaction).State = EntityState.Detached;
 				LedgerTransaction? replayTransaction = await _context.Transactions.AsNoTracking().FirstOrDefaultAsync(x => x.AccountId == accountId && x.IdempotencyKey == idempotencyKey, ct);
-				if (replayTransaction != null) {
+				if (replayTransaction != null)
+				{
 					return new PostResult.Replayed(replayTransaction);
-				} else
+				}
+				else
 				{
 					throw;
 				}
@@ -100,7 +104,7 @@ namespace LedgerApi.Services
 		{
 			return await _context.Transactions.Where(t => t.AccountId == accountId).AsNoTracking().ToListAsync(ct);
 		}
-		 
+
 		public async Task<Money> GetBalanceAsync(Guid accountId, string currency, CancellationToken ct)
 		{
 			Money accountBalance = new(0, currency);

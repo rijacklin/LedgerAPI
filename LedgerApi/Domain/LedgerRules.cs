@@ -4,6 +4,7 @@
 	{
 		public static Money Signed(TransactionType type, Money amount)
 		{
+			if (amount.Cents <= 0) throw new ArgumentOutOfRangeException(nameof(amount), amount.Cents, "Ledger amounts must be positive and greater than zero.");
 			return type switch
 			{
 				TransactionType.Charge => amount,

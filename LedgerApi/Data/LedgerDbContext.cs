@@ -1,5 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
-using LedgerApi.Domain;
+﻿using LedgerApi.Domain;
+using Microsoft.EntityFrameworkCore;
 
 namespace LedgerApi.Data
 {
