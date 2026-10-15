@@ -37,7 +37,5 @@ app.MapControllers();
 
 app.Run();
 
-public partial class Program
-{
-
-}
+// for integration testing
+public partial class Program {}
