@@ -15,6 +15,7 @@ namespace LedgerApi.Tests
 				Type = type,
 				Amount = new Money(cents, Currency),
 				IdempotencyKey = Guid.NewGuid().ToString(),
+				RequestHash = "test-hash", // not under test here; the rules never look at it
 				CreatedAt = DateTimeOffset.UtcNow,
 			};
 

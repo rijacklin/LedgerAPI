@@ -59,8 +59,14 @@ namespace LedgerApi.Migrations
                     b.Property<Guid?>("OriginalTransactionId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Type")
                         .IsRequired()
+                        .HasMaxLength(16)
                         .HasColumnType("TEXT");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "LedgerApi.Domain.LedgerTransaction.Amount#Money", b1 =>

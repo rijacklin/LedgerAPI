@@ -8,6 +8,7 @@
 		required public Money Amount { get; set; }
 		public Guid? OriginalTransactionId { get; set; } // only applies to refunds
 		required public string IdempotencyKey { get; set; }
+		required public string RequestHash { get; set; }
 		public DateTimeOffset CreatedAt { get; set; }
 	}
 }

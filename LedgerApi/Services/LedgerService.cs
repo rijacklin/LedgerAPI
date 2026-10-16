@@ -3,6 +3,8 @@ using LedgerApi.Data;
 using LedgerApi.Domain;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace LedgerApi.Services
 {
@@ -26,7 +28,10 @@ namespace LedgerApi.Services
 
 		public async Task<PostResult> PostAsync(Guid accountId, string idempotencyKey, Dtos.PostTransactionRequest req, CancellationToken ct)
 		{
+			var type = req.Type!.Value;
+
 			Money requestedAmount = new(req.AmountCents, req.Currency);
+			string requestHash = Fingerprint(type, req);
 
 			// grab account by id
 			Account? account = await _context.Accounts.FirstOrDefaultAsync(x => x.Id == accountId, ct);
@@ -34,14 +39,17 @@ namespace LedgerApi.Services
 
 			// check for existing transaction with identical idempotency key
 			LedgerTransaction? existingTransaction = await _context.Transactions.AsNoTracking().FirstOrDefaultAsync(x => x.AccountId == accountId && x.IdempotencyKey == idempotencyKey, ct);
-			if (existingTransaction != null) return new PostResult.Replayed(existingTransaction);
+			if (existingTransaction != null)
+				return existingTransaction.RequestHash == requestHash
+					? new PostResult.Replayed(existingTransaction)
+					: new PostResult.KeyReuseMismatch();
 
 			// ensure matching currencies
 			if (req.Currency != account.Currency)
 				return new PostResult.Rejected(new RuleViolation("currency_mismatch", "Currencies must be the same."));
 
 			RuleViolation? violation = null;
-			switch (req.Type)
+			switch (type)
 			{
 				case TransactionType.Refund:
 					// refunds require a corresponding original transaction
@@ -61,7 +69,7 @@ namespace LedgerApi.Services
 				case TransactionType.Charge:
 					break;
 				default:
-					throw new ArgumentOutOfRangeException($"Transaction type, {req.Type}, not found.");
+					throw new ArgumentOutOfRangeException($"Transaction type, {type}, not found.");
 			}
 
 			if (violation != null)
@@ -71,10 +79,11 @@ namespace LedgerApi.Services
 			{
 				Id = Guid.NewGuid(),
 				AccountId = accountId,
-				Type = req.Type!.Value,
+				Type = type,
 				Amount = requestedAmount,
-				OriginalTransactionId = req.Type!.Value == TransactionType.Refund ? req.OriginalTransactionId : null,
+				OriginalTransactionId = type == TransactionType.Refund ? req.OriginalTransactionId : null,
 				IdempotencyKey = idempotencyKey,
+				RequestHash = requestHash,
 				CreatedAt = DateTimeOffset.UtcNow
 			};
 
@@ -90,7 +99,7 @@ namespace LedgerApi.Services
 				LedgerTransaction? replayTransaction = await _context.Transactions.AsNoTracking().FirstOrDefaultAsync(x => x.AccountId == accountId && x.IdempotencyKey == idempotencyKey, ct);
 				if (replayTransaction != null)
 				{
-					return new PostResult.Replayed(replayTransaction);
+					return replayTransaction.RequestHash == requestHash ? new PostResult.Replayed(replayTransaction) : new PostResult.KeyReuseMismatch();
 				}
 				else
 				{
@@ -114,6 +123,15 @@ namespace LedgerApi.Services
 				accountBalance = accountBalance.Add(LedgerRules.Signed(t.Type, t.Amount));
 			}
 			return accountBalance;
+		}
+
+		private static string Fingerprint(TransactionType type, Dtos.PostTransactionRequest req)
+		{
+			Guid? original = type == TransactionType.Refund ? req.OriginalTransactionId : null;
+
+			// create deterministic hash
+			string canonical = $"{type}|{req.AmountCents}|{req.Currency}|{original}";
+			return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
 		}
 	}
 }

@@ -22,6 +22,9 @@ namespace LedgerApi.Data
 
 			// convert transaction type enum values to strings.
 			b.Entity<LedgerTransaction>().Property(t => t.Type).HasConversion<string>().HasMaxLength(16);
+
+			// configure sha-256 hash for fingerprinting
+			b.Entity<LedgerTransaction>().Property(t => t.RequestHash).HasMaxLength(64);
 		}
 	}
 }
