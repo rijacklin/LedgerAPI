@@ -28,7 +28,8 @@ namespace LedgerApi.Services
 
 		public async Task<PostResult> PostAsync(Guid accountId, string idempotencyKey, Dtos.PostTransactionRequest req, CancellationToken ct)
 		{
-			var type = req.Type!.Value;
+			if (req.Type is not { } type)
+				return new PostResult.Rejected(new RuleViolation("type_required", "Transaction type is required."));
 
 			Money requestedAmount = new(req.AmountCents, req.Currency);
 			string requestHash = Fingerprint(type, req);

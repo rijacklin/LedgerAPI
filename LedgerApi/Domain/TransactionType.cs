@@ -1,9 +1,13 @@
-﻿namespace LedgerApi.Domain
+﻿using System.Text.Json.Serialization;
+
+namespace LedgerApi.Domain
 {
-	public enum TransactionType
+	// serialize enum values as strings; integer values are rejected.
+	[JsonConverter(typeof(StringOnlyEnumConverter))]
+	public enum TransactionType { Charge, Refund, Payout }
+
+	public class StringOnlyEnumConverter : JsonStringEnumConverter
 	{
-		Charge,
-		Refund,
-		Payout
+		public StringOnlyEnumConverter() : base(namingPolicy: null, allowIntegerValues: false) { }
 	}
 }

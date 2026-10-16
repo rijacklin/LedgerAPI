@@ -26,10 +26,9 @@ namespace LedgerApi.Tests
 			HttpResponseMessage res = await _client.PostAsJsonAsync($"/accounts/", body);
 			res.EnsureSuccessStatusCode();
 			var account = await res.Content.ReadFromJsonAsync<Dtos.AccountResponse>();
-			return account!.Id;
+			return account == null ? throw new Exception("account not found.") : account.Id;
 		}
 
-		// #TODO: Fix
 		[Fact]
 		public async Task Ensure_Transaction_Idempotency()
 		{
@@ -51,10 +50,11 @@ namespace LedgerApi.Tests
 			res = await _client.GetAsync($"/accounts/{accountId}/transactions");
 			res.EnsureSuccessStatusCode();
 			var transactions = await res.Content.ReadFromJsonAsync<List<Dtos.TransactionResponse>>();
+			Assert.NotNull(transactions);
 
 			// ensure single transaction and accurate charge amount
-			Assert.Single(transactions!);
-			Assert.Equal(10_000, transactions![0].AmountCents);
+			Assert.Single(transactions);
+			Assert.Equal(10_000, transactions[0].AmountCents);
 		}
 
 		[Fact]
@@ -68,7 +68,8 @@ namespace LedgerApi.Tests
 			var res = await PostTransactionAsync(accountId, transactionRequest, "charge-1");
 			res.EnsureSuccessStatusCode();
 			var transaction = await res.Content.ReadFromJsonAsync<Dtos.TransactionResponse>();
-			var transactionId = transaction!.Id;
+			Assert.NotNull(transaction);
+			var transactionId = transaction.Id;
 
 			// attempt to refund more than original charge
 			Dtos.PostTransactionRequest refundRequest = new(TransactionType.Refund, 11_000, "CAD", transactionId);
@@ -104,8 +105,9 @@ namespace LedgerApi.Tests
 			// only the original charge was recorded
 			res = await _client.GetAsync($"/accounts/{accountId}/transactions");
 			var transactions = await res.Content.ReadFromJsonAsync<List<Dtos.TransactionResponse>>();
-			Assert.Single(transactions!);
-			Assert.Equal(10_000, transactions![0].AmountCents);
+			Assert.NotNull(transactions);
+			Assert.Single(transactions);
+			Assert.Equal(10_000, transactions[0].AmountCents);
 		}
 	}
 }
