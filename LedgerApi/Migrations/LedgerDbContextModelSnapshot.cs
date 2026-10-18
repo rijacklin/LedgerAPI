@@ -73,7 +73,7 @@ namespace LedgerApi.Migrations
                         {
                             b1.IsRequired();
 
-                            b1.Property<long>("Cents")
+                            b1.Property<long>("Amount")
                                 .HasColumnType("INTEGER");
 
                             b1.Property<string>("Currency")

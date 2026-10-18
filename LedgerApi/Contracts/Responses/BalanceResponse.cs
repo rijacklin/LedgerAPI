@@ -1,4 +1,7 @@
 namespace LedgerApi.Contracts.Responses
 {
-    public record BalanceResponse(Guid AccountId, string Currency, long BalanceCents);
+    /// <summary>
+    /// An account's balance at the time of the request, in minor units (e.g. cents) of its currency.
+    /// </summary>
+    public record BalanceResponse(Guid AccountId, string Currency, long Balance);
 }

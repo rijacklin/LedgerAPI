@@ -1,3 +1,4 @@
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -30,11 +31,12 @@ namespace LedgerApi.Migrations
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
                     AccountId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    Type = table.Column<string>(type: "TEXT", nullable: false),
+                    Type = table.Column<string>(type: "TEXT", maxLength: 16, nullable: false),
                     OriginalTransactionId = table.Column<Guid>(type: "TEXT", nullable: true),
                     IdempotencyKey = table.Column<string>(type: "TEXT", nullable: false),
+                    RequestHash = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    Amount_Cents = table.Column<long>(type: "INTEGER", nullable: false),
+                    Amount_Amount = table.Column<long>(type: "INTEGER", nullable: false),
                     Amount_Currency = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
