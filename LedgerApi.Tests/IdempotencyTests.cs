@@ -3,7 +3,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using LedgerApi.Contracts.Requests;
 using LedgerApi.Contracts.Responses;
+using LedgerApi.Data;
 using LedgerApi.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LedgerApi.Tests
 {
@@ -13,6 +16,7 @@ namespace LedgerApi.Tests
     /// </summary>
     public class IdempotencyTests(LedgerApiFactory factory) : IClassFixture<LedgerApiFactory>
     {
+        private readonly LedgerApiFactory _factory = factory;
         private readonly HttpClient _client = factory.CreateClient();
         private readonly string _idempotencyKey = "charge-1";
 
@@ -180,6 +184,39 @@ namespace LedgerApi.Tests
             Assert.NotNull(transactions);
             Assert.Single(transactions);
             Assert.Equal(10_000, transactions[0].Amount);
+        }
+
+        /// <summary>
+        /// A replay against an account that no longer exists returns 404 rather than the original
+        /// transaction, because the account lookup runs before the idempotency lookup.
+        /// </summary>
+        [Fact]
+        public async Task Replay_Against_Missing_Account_Returns_404()
+        {
+            var accountId = await CreateAccountAsync(
+                new CreateAccountRequest("TestAccount", "CAD")
+            );
+
+            // original charge with key, expect Created response
+            PostTransactionRequest transactionRequest = new(
+                TransactionType.Charge,
+                10_000,
+                "CAD",
+                null
+            );
+            var res = await PostTransactionAsync(accountId, transactionRequest, _idempotencyKey);
+            Assert.Equal(HttpStatusCode.Created, res.StatusCode);
+
+            // the API has no delete endpoint, so remove the account row directly; its transactions remain
+            using (IServiceScope scope = _factory.Services.CreateScope())
+            {
+                LedgerDbContext db = scope.ServiceProvider.GetRequiredService<LedgerDbContext>();
+                await db.Accounts.Where(a => a.Id == accountId).ExecuteDeleteAsync();
+            }
+
+            // identical replay, expect 404 even though a transaction exists for this key
+            res = await PostTransactionAsync(accountId, transactionRequest, _idempotencyKey);
+            Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
         }
     }
 }

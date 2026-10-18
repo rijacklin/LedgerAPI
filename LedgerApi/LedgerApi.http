@@ -1,10 +1,10 @@
 @LedgerApi_HostAddress = http://localhost:5052
 
-GET {{LedgerApi_HostAddress}}/accounts/3d482316-4024-418d-9814-7e30b1a1bebc/balance
-Accept: application/json
+# Run top to bottom. Later requests reuse ids returned by earlier ones.
 
-###
+### Create an account. Expect 201.
 
+# @name createAccount
 POST {{LedgerApi_HostAddress}}/accounts/
 Content-Type: application/json
 
@@ -13,9 +13,10 @@ Content-Type: application/json
   "currency": "CAD"
 }
 
-###
+### Post a charge. Expect 201.
 
-POST {{LedgerApi_HostAddress}}/accounts/3d482316-4024-418d-9814-7e30b1a1bebc/transactions
+# @name createCharge
+POST {{LedgerApi_HostAddress}}/accounts/{{createAccount.response.body.$.id}}/transactions
 Content-Type: application/json
 Idempotency-Key: test-charge-1
 
@@ -24,3 +25,98 @@ Idempotency-Key: test-charge-1
   "amount": 10000,
   "currency": "CAD"
 }
+
+### Replay the same charge with the same key. Expect 200 and the original transaction.
+
+POST {{LedgerApi_HostAddress}}/accounts/{{createAccount.response.body.$.id}}/transactions
+Content-Type: application/json
+Idempotency-Key: test-charge-1
+
+{
+  "type": "Charge",
+  "amount": 10000,
+  "currency": "CAD"
+}
+
+### Reuse the key with a different amount. Expect 422 with code idempotency_key_reuse.
+
+POST {{LedgerApi_HostAddress}}/accounts/{{createAccount.response.body.$.id}}/transactions
+Content-Type: application/json
+Idempotency-Key: test-charge-1
+
+{
+  "type": "Charge",
+  "amount": 20000,
+  "currency": "CAD"
+}
+
+### Omit the Idempotency-Key header. Expect 400.
+
+POST {{LedgerApi_HostAddress}}/accounts/{{createAccount.response.body.$.id}}/transactions
+Content-Type: application/json
+
+{
+  "type": "Charge",
+  "amount": 10000,
+  "currency": "CAD"
+}
+
+### Refund part of the charge. Expect 201.
+
+POST {{LedgerApi_HostAddress}}/accounts/{{createAccount.response.body.$.id}}/transactions
+Content-Type: application/json
+Idempotency-Key: test-refund-1
+
+{
+  "type": "Refund",
+  "amount": 4000,
+  "currency": "CAD",
+  "originalTransactionId": "{{createCharge.response.body.$.id}}"
+}
+
+### Refund more than remains of the charge. Expect 422 with code refund_exceeds_charge.
+
+POST {{LedgerApi_HostAddress}}/accounts/{{createAccount.response.body.$.id}}/transactions
+Content-Type: application/json
+Idempotency-Key: test-refund-2
+
+{
+  "type": "Refund",
+  "amount": 7000,
+  "currency": "CAD",
+  "originalTransactionId": "{{createCharge.response.body.$.id}}"
+}
+
+### Pay out part of the balance. Expect 201.
+
+POST {{LedgerApi_HostAddress}}/accounts/{{createAccount.response.body.$.id}}/transactions
+Content-Type: application/json
+Idempotency-Key: test-payout-1
+
+{
+  "type": "Payout",
+  "amount": 3000,
+  "currency": "CAD"
+}
+
+### Pay out more than the balance. Expect 422 with code payout_exceeds_balance.
+
+POST {{LedgerApi_HostAddress}}/accounts/{{createAccount.response.body.$.id}}/transactions
+Content-Type: application/json
+Idempotency-Key: test-payout-2
+
+{
+  "type": "Payout",
+  "amount": 999999,
+  "currency": "CAD"
+}
+
+### Get the balance. Expect 3000 after the requests above (10000 - 4000 - 3000).
+
+GET {{LedgerApi_HostAddress}}/accounts/{{createAccount.response.body.$.id}}/balance
+Accept: application/json
+
+### List transactions, oldest first.
+
+GET {{LedgerApi_HostAddress}}/accounts/{{createAccount.response.body.$.id}}/transactions
+Accept: application/json

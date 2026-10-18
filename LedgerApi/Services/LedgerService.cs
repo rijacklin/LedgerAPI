@@ -67,7 +67,7 @@ namespace LedgerApi.Services
                 return new PostResult.AccountNotFound();
             }
 
-            // idempotency: replay a prior result for this key, or reject reuse with a different payload
+            // replay existing transaction for this key; after account lookup, before rule checks so retries skip them
             if (
                 await FindExistingTransactionAsync(accountId, idempotencyKey, requestHash, ct) is
                 { } existing
