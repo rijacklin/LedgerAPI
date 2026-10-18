@@ -1,10 +1,10 @@
-﻿namespace LedgerApi.Domain
+namespace LedgerApi.Domain
 {
-	public class Account
-	{
-		public Guid Id { get; set; }
-		required public string Name { get; set; }
-		required public string Currency { get; set; }
-		public DateTimeOffset CreatedAt { get; set; }
-	}
+    public class Account
+    {
+        public Guid Id { get; set; }
+        public required string Name { get; set; }
+        public required string Currency { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+    }
 }

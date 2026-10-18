@@ -1,4 +1,4 @@
-﻿namespace LedgerApi.Domain
+namespace LedgerApi.Domain
 {
-	public record RuleViolation(string Code, string Message);
+    public record RuleViolation(string Code, string Message);
 }
