@@ -61,7 +61,8 @@ namespace LedgerApi.Controllers
         /// <summary>
         /// Posts a charge, refund, or payout to an account. Requires an Idempotency-Key header.
         /// Returns 201 for a new transaction, 200 for a replay of an earlier request, 404 if the account
-        /// does not exist, and 422 if a business rule is violated or the key was reused with a different payload.
+        /// does not exist, 422 if a business rule is violated or the key was reused with a different payload,
+        /// and 503 if the write kept colliding with other requests; retry with the same Idempotency-Key.
         /// </summary>
         [HttpPost("{id:guid}/transactions")]
         public async Task<IActionResult> PostTransaction(
@@ -84,6 +85,11 @@ namespace LedgerApi.Controllers
                     nameof(GetTransactions),
                     new { id },
                     TransactionResponse.From(c.Transaction)
+                ),
+                PostResult.Busy => Problem(
+                    detail: "The ledger is busy; retry with the same Idempotency-Key.",
+                    statusCode: 503,
+                    title: "Transaction collision"
                 ),
                 PostResult.Replayed r => Ok(TransactionResponse.From(r.Transaction)),
                 PostResult.AccountNotFound => NotFound(),

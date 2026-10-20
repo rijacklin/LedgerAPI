@@ -1,8 +1,8 @@
 namespace LedgerApi.Domain
 {
     /// <summary>
-    /// A single entry in an account's ledger. Entries are append-only: corrections are made by
-    /// posting a refund or payout, not by editing an existing transaction.
+    /// A single entry in an account's ledger. Entries are never edited or removed; a charge is
+    /// reversed by posting a refund.
     /// </summary>
     public class LedgerTransaction
     {

@@ -16,11 +16,17 @@ namespace LedgerApi.Tests
         );
 
         /// <summary>
+        /// Connection string for the temporary database, so tests can open their own connection to it.
+        /// The 1-second timeout makes a locked database fail fast, which lets the retry path be exercised.
+        /// </summary>
+        public string ConnectionString => $"Data Source={_dbPath};Pooling=False;Default Timeout=1";
+
+        /// <summary>
         /// Points the API at the temporary database. Pooling is disabled so SQLite releases the file
         /// when connections close, allowing it to be deleted on dispose.
         /// </summary>
         protected override void ConfigureWebHost(IWebHostBuilder builder) =>
-            builder.UseSetting("ConnectionStrings:Ledger", $"Data Source={_dbPath};Pooling=False");
+            builder.UseSetting("ConnectionStrings:Ledger", ConnectionString);
 
         /// <summary>
         /// Deletes the temporary database file.

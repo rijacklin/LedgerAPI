@@ -17,6 +17,8 @@ namespace LedgerApi.Services
 
         public sealed record Created(LedgerTransaction Transaction) : PostResult;
 
+        public sealed record Busy : PostResult;
+
         /// <summary>The idempotency key and payload matched an earlier request; returns the original.</summary>
         public sealed record Replayed(LedgerTransaction Transaction) : PostResult;
 
@@ -240,8 +242,10 @@ namespace LedgerApi.Services
         }
 
         /// <summary>
-        /// Inserts the transaction. If a concurrent request with the same idempotency key wins the
-        /// race, resolves against the winner's row as a replay or mismatch instead of failing.
+        /// Inserts the transaction. If the database is busy, retries with exponential backoff and
+        /// returns <see cref="PostResult.Busy"/> once <see cref="Backoff.MaxAttempts"/> is reached.
+        /// If a concurrent request with the same idempotency key wins the race, resolves against the
+        /// winner's row as a replay or mismatch instead of failing.
         /// </summary>
         private async Task<PostResult> PersistAsync(
             LedgerTransaction transaction,
@@ -250,30 +254,43 @@ namespace LedgerApi.Services
         {
             context.Transactions.Add(transaction);
 
-            try
+            for (int attempt = 1; ; attempt++)
             {
-                await context.SaveChangesAsync(ct);
-            }
-            catch (DbUpdateException ex)
-                when (ex.InnerException is SqliteException { SqliteErrorCode: 19 })
-            {
-                context.Entry(transaction).State = EntityState.Detached;
-                if (
-                    await FindExistingTransactionAsync(
-                        transaction.AccountId,
-                        transaction.IdempotencyKey,
-                        transaction.RequestHash,
-                        ct
-                    ) is
-                    { } concurrentResult
-                )
+                try
                 {
-                    return concurrentResult;
+                    await context.SaveChangesAsync(ct);
+                    return new PostResult.Created(transaction);
                 }
-                throw;
+                // collision has occurred; applies exponential backoff to resolve (wait a random time, then retry)
+                catch (DbUpdateException ex)
+                    when (ex.InnerException is SqliteException { SqliteErrorCode: 5 or 6 })
+                {
+                    if (attempt == Backoff.MaxAttempts)
+                    {
+                        return new PostResult.Busy();
+                    }
+                    await Task.Delay(Backoff.Delay(attempt, Random.Shared), ct);
+                }
+                // a transaction with this idempotency-key was already committed; return it (or KeyReuseMismatch if the payload differs)
+                catch (DbUpdateException ex)
+                    when (ex.InnerException is SqliteException { SqliteErrorCode: 19 })
+                {
+                    context.Entry(transaction).State = EntityState.Detached;
+                    if (
+                        await FindExistingTransactionAsync(
+                            transaction.AccountId,
+                            transaction.IdempotencyKey,
+                            transaction.RequestHash,
+                            ct
+                        ) is
+                        { } concurrentResult
+                    )
+                    {
+                        return concurrentResult;
+                    }
+                    throw;
+                }
             }
-
-            return new PostResult.Created(transaction);
         }
 
         /// <summary>
